@@ -10,7 +10,7 @@ It consists of a small PCB hosting the LCD, Arduino Micro R3, and connectors tha
 optional toroidal transformer to sense AC line current.  A single pushbutton is used to clear the rev count and alternate between
 modes. This photos shows the board during early testing.  A mounting solution is in progress.
 
-![Monitor Board](photos/motor_monitor_pcb.jpg?raw=true "Monitor Board")
+<img src="photos/motor_monitor_pcb.jpg" width="480" alt="Monitor Board">
 
 This project was motivated by the need to keep an accurate count of spindle revolutions while winding coils on a mini-lathe. 
 Since the BLDC motor controller already has a means of tracking spindle revolutions, it was easy to tap into this circuit rather than 
@@ -20,7 +20,7 @@ The motor controller in my lathe is this one pictured below. I haven't been able
 but it does seem to be pretty widely used. The pinout for the hall-effect connector is learned by inspection.  Recently I found 
 a [very low-quality schematic](doc/500W-1000W_spindle_control_PCB_01.jpg?raw=true). It may or may not be for this particular driver board. 
 
-![Driver Board](photos/bldc_board.png?raw=true "BLDC Board")
+<img src="photos/bldc_board.png" width="480" alt="BLDC Board">
 
 ### WARNING and DISCLAIMER
 Although the BLDC 5V power seems to be isolated from AC mains and chassis, be careful to avoid 
