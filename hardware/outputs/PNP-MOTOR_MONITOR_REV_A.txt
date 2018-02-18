@@ -1,0 +1,39 @@
+Designator Footprint               Mid X         Mid Y         Ref X         Ref Y         Pad X         Pad Y TB      Rotation Comment        
+
+R12        RES_0603/1608        71.398mm       3.767mm      71.398mm       3.767mm      72.048mm       3.767mm  T        180.00 2.2k           
+U2         ARDUINO_MICRO_R3       55.76mm       17.88mm       31.63mm        8.99mm       35.44mm       10.26mm  T         90.00 ArduinoMicroR3 
+C5         CAP_0603/1608        70.128mm      29.548mm      70.128mm      29.548mm      69.453mm      29.548mm  T        360.00 0.10uF         
+C1         CAP_0805/2012        11.708mm      18.753mm      11.708mm      18.753mm      11.708mm      19.553mm  T        270.00 10uF           
+C2         CAP_0603/1608        29.488mm      23.452mm      29.488mm      23.452mm      29.488mm      24.127mm  T        270.00 0.10uF         
+C4         CAP_0603/1608          59.6mm      29.548mm        59.6mm      29.548mm      60.275mm      29.548mm  T        180.00 0.10uF         
+C3         CAP_0603/1608        49.781mm      29.548mm      49.781mm      29.548mm      50.456mm      29.548mm  T        180.00 0.10uF         
+D4         SOD123F                  15mm          26mm          15mm          26mm          15mm       24.57mm  T         90.00 SMF5.0A        
+D10        0603R-GENERIC       47.4585mm       1.608mm       46.76mm       1.608mm       46.76mm       1.608mm  T        360.00 RUN            
+D11        0603R-GENERIC       55.8405mm       1.608mm      56.539mm       1.608mm      56.539mm       1.608mm  T        180.00 Debug1         
+D3         SOD123F                11.5mm       25.93mm        11.5mm       25.93mm        11.5mm        24.5mm  T         90.00 SMF5.0A        
+D5         SOD123F               15.01mm      19.388mm       15.01mm      19.388mm       15.01mm      20.818mm  T        270.00 SMF5.0A        
+D6         SOD123F              18.058mm      19.388mm      18.058mm      19.388mm      18.058mm      20.818mm  T        270.00 SMF5.0A        
+D7         SOD123F              21.106mm      19.388mm      21.106mm      19.388mm      21.106mm      20.818mm  T        270.00 SMF5.0A        
+D2         SOD123F               4.596mm      14.054mm       4.596mm      14.054mm       4.596mm      12.624mm  T         90.00 SMF5.0A        
+D1         SOD123F               1.802mm      14.054mm       1.802mm      14.054mm       1.802mm      12.624mm  T         90.00 SMF5.0A        
+D9         SOD123F                  27mm          26mm          27mm          26mm          27mm       24.57mm  T         90.00 SMF5.0A        
+D8         SOD123F                  24mm          26mm          24mm          26mm          24mm       24.57mm  T         90.00 SMF5.0A        
+J3         JST_XH_B6B-XH-A       16.26mm       3.132mm       16.26mm       3.132mm       22.51mm       3.132mm  T        180.00 B6B-XH-A(LF)(SN)
+J2         JST_XH_B3B-XH-A        11.5mm          32mm        11.5mm          32mm          14mm          32mm  T        180.00 B3B-XH-A(LF)(SN)
+J4         JST_XH_B6B-XH-A       16.26mm      12.784mm       16.26mm      12.784mm       22.51mm      12.784mm  T        180.00 B6B-XH-A(LF)(SN)
+J1         JST_XH_B2B-XH-A           5mm          22mm           5mm          22mm        6.25mm          22mm  T        180.00 B2B-XH-A(LF)(SN)
+J5         JST_XH_B4B-XH-A       24.75mm          32mm       24.75mm          32mm        28.5mm          32mm  T        180.00 B4B-XH-A(LF)(SN)
+R11        POT_Panasonic_EVM      66.268mm       2.751mm      66.318mm       2.751mm      67.868mm       1.751mm  T         90.00 2k             
+R3         RES_0603/1608        34.426mm      29.548mm      34.426mm      29.548mm      33.776mm      29.548mm  T          0.00 51             
+R1         RES_0603/1608        27.504mm      13.364mm      27.504mm      13.364mm      27.504mm      12.714mm  T         90.00 2.2k           
+R2         RES_0603/1608        29.504mm      13.364mm      29.504mm      13.364mm      29.504mm      12.714mm  T         90.00 2.2k           
+R5         RES_0603/1608         43.71mm      29.548mm       43.71mm      29.548mm       43.06mm      29.548mm  T        360.00 2.2k           
+R4         RES_0603/1608        37.743mm      29.548mm      37.743mm      29.548mm      37.093mm      29.548mm  T          0.00 51             
+R9         RES_0603/1608        55.917mm      29.548mm      55.917mm      29.548mm      55.267mm      29.548mm  T        360.00 2.2k           
+R6         RES_0603/1608        44.474mm       1.608mm      44.474mm       1.608mm      43.824mm       1.608mm  T        360.00 2.2k           
+R10        RES_0603/1608         58.84mm       1.608mm       58.84mm       1.608mm       59.49mm       1.608mm  T        180.00 2.2k           
+R7         RES_0603/1608        46.758mm      29.548mm      46.758mm      29.548mm      47.408mm      29.548mm  T        180.00 51             
+R8         RES_0603/1608        52.854mm      29.548mm      52.854mm      29.548mm      53.504mm      29.548mm  T        180.00 51             
+U3         WH1602B1                 40mm       18.25mm          80mm          36mm          72mm          34mm  B        180.00 WH1602B1       
+U1         SO8_N                27.062mm      19.261mm      27.062mm      19.261mm      24.662mm      21.166mm  T          0.00 FM24C04B-G     
+
