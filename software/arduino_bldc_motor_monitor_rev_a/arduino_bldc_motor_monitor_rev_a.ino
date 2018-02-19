@@ -1,15 +1,15 @@
-// Motor monitor for the LMS 5200 mini-lathe, LMS3990 mini-mill and similar 
+// Motor monitor for the LMS 5200 mini-lathe, LMS3990 mini-mill and similar
 // tools that use the XMT-DRV-500C(3) / ZM3404 BLDC motor controller PCB.
 //
-// The monitor board plugs into the BLDC motor hall effect sensor connector, 
+// The monitor board plugs into the BLDC motor hall effect sensor connector,
 // which supplies 5VDC power and position pulses. From this, and knowledge
 // of the belt drive ratio, we calculate spindle speed and direction.
 // We also keep a count of spindle revolutions, which is useful for coil winding.
 //
 // Rev count is periodically stored in an I2C FRAM so that a power interruption
-// (which happens due to fault or safety activation) won't zero the count.  
-// We store two counts, total lifetime count (absolute) and incremental.  
-// Incremental count is erased by holding the pushbutton for a few seconds. 
+// (which happens due to fault or safety activation) won't zero the count.
+// We store two counts, total lifetime count (absolute) and incremental.
+// Incremental count is erased by holding the pushbutton for a few seconds.
 // Briefly pressing pushbutton switches between absolute and incremental mode.
 //
 // We also monitor the motor current using an isolated current sense transformer,
@@ -20,7 +20,7 @@
 // https://www.tonylabs.com/wp-content/uploads/arduino-micro-pinout-diagram.png
 //
 // Warning: Disconnnect the board from the BLDC motor controller when connecting
-// to USB for programming!  Otherwise you risk damage to your motor driver and 
+// to USB for programming!  Otherwise you risk damage to your motor driver and
 // computer.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +28,7 @@
 // Copyright 2017 B. Kuschak <bkuschak@yahoo.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
-// hardware, software, and associated documentation files (the "Product"), to deal in 
+// hardware, software, and associated documentation files (the "Product"), to deal in
 // the Product without restriction, including without limitation the rights to use, copy,
 // modify, merge, publish, distribute, sublicense, and/or sell copies of the Product, and
 // to permit persons to whom the Product is furnished to do so, subject to the following
@@ -36,8 +36,8 @@
 //
 // The above copyright notice and this permission notice shall be included in all copies
 // or substantial portions of the Product.
-// 
-// THE PRODUCT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+//
+// THE PRODUCT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
 // INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
 // PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 // LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT
@@ -48,6 +48,8 @@
 #include <LiquidCrystal.h>
 #include <Wire.h>
 
+#include <avr/boot.h>
+
 /////////////////////////////////////////////////////////////////////////
 // These might be different based on your motor and drivetrain:
 // Hall effect sensor
@@ -57,8 +59,11 @@
 #define DRIVE_RATIO           2.0           // motor revs per spindle rev
 
 // Should be +1 or -1 depending on what constitutes 'forward' and 'reverse'
-#define ROTATION_CONVENTION   -1            
+#define ROTATION_CONVENTION   -1
 /////////////////////////////////////////////////////////////////////////
+
+#define VER_STR               "Motor Mon v1.0.2"  // should be 16 characters
+#define LCD_UPDATE_TIME_MSEC  850
 
 // 3 Hall effect sensor inputs - on PCINT capable pins
 #define PIN_HALL_A            8             // PB4 (board pin 8)
@@ -87,7 +92,6 @@
 #define FRAM_SIGNATURE        0xACDC1234
 #define FRAM_VERSION          1
 
-#define LCD_UPDATE_TIME_MSEC  500
 #define DISPLAY_INCREMENTAL   0
 #define DISPLAY_LIFETIME      1
 
@@ -110,6 +114,8 @@ uint32_t adc_sample_rate;
 float rpm;
 float motor_curr;
 uint8_t rev_display_mode;
+int32_t rpm_update_hall_count;
+uint32_t rpm_update_time;
 
 // Note, Wire library has a limitation of <32 bytes, so this has to be smaller
 struct fram_data_t
@@ -120,7 +126,7 @@ struct fram_data_t
   int32_t  hall_count;
   uint32_t reserved1;
   uint32_t csum;
-} __attribute__((aligned(8),packed)) fram_data;
+} __attribute__((aligned(8), packed)) fram_data;
 
 
 // Store rev count in FRAM.  FRAM lifetime is essentially unlimited, however power loss
@@ -135,7 +141,7 @@ int store_fram(void)
   uint8_t i, j;
   uint32_t csum = 0;
   uint8_t fram_addr = 0;
- 
+
   fram_data.signature = FRAM_SIGNATURE;
   fram_data.version = FRAM_VERSION;
   fram_data.reserved1 = 0;
@@ -156,7 +162,7 @@ int store_fram(void)
   fram_data.csum = ~csum;                       // so all zero doesn't fool us
 
   // write 2 copies of data to I2C FRAM.  if power fails during write, the other one should
-  // remain intact.
+  // remain intact.  FIXME - this assumes power fails quickly.  
   for (j = 0; j < 2; j++) {
 
     // We use 4Kbit FRAM: it has 8 bit address plus one page select bit
@@ -166,6 +172,10 @@ int store_fram(void)
     for (i = 0; i < sizeof(fram_data); i++)
       Wire.write(*ptr8++);
     Wire.endTransmission();
+
+    // FIXME Verify write was successful before starting next? (in case power is going down 
+    // while we're writing.) Complicated because FRAM read is destructive at the physical level.
+    // So a verify may succeed, but actually the data can't be immediately rewritten.
 
     fram_addr += sizeof(fram_data);
   }
@@ -208,8 +218,8 @@ int load_fram(void)
           case FRAM_VERSION:
             // this is our native version
             hall_count = fram_data.hall_count;
-            //lifetime_hall_count = fram_data.lifetime_hall_count;
-            return 0;                         // use it
+            rpm_update_hall_count = hall_count;   // to avoid glitch on first RPM calc
+            return 0;                             // use it
           // In future releases we might need to do some translation here..
           //case FRAM_VERSION-1:
           // translate as needed...
@@ -268,7 +278,7 @@ void hall_handler(void)
     diff = -1;
 
   // Lathe motor rotation sense is opposite (+1 count is reverse, -1 is forward)
-  
+
   if (diff == (1 * ROTATION_CONVENTION)) {
     hall_count++;
     dir = 1;
@@ -464,7 +474,7 @@ void update_lcd(void)
   //rpm = 1234;
   //hall_count = 80000000.0 * COUNTS_PER_MOTOR_REV * DRIVE_RATIO;
   // seems like +/-89e6 is the limit (continuous operation for 24 days)
-  
+
   // First line
   // 1400 RPM FORWARD
   snprintf(str, sizeof(str), "%4u RPM %s",
@@ -481,18 +491,18 @@ void update_lcd(void)
   // FIXME handle wraparound
   dtostrf(motor_curr, 3, 2, str_curr);    // snprintf doesn't have %f
   if (rev_display_mode == DISPLAY_LIFETIME)
-    //snprintf(str_revs, sizeof(str_revs), "%9lu", 
+    //snprintf(str_revs, sizeof(str_revs), "%9lu",
     dtostrf(fram_data.lifetime_hall_count / COUNTS_PER_MOTOR_REV / DRIVE_RATIO, 9, 0, str_revs);
-  else   
+  else
     dtostrf(get_revs(), 9, 1, str_revs);    // snprintf doesn't have %f
   str_curr[4] = 0;
   str_revs[9] = 0;
-  if(last_mode == rev_display_mode)
+  if (last_mode == rev_display_mode)
     snprintf(str, sizeof(str), "%s A %s", str_curr, str_revs);
   else
-    snprintf(str, sizeof(str), "%s A %s", str_curr, 
-      ((rev_display_mode == DISPLAY_LIFETIME) ? " LIFETIME" :
-      ((rev_display_mode == DISPLAY_INCREMENTAL) ? "INCREMENT" : "")));                              
+    snprintf(str, sizeof(str), "%s A %s", str_curr,
+             ((rev_display_mode == DISPLAY_LIFETIME) ? " LIFETIME" :
+              ((rev_display_mode == DISPLAY_INCREMENTAL) ? "INCREMENT" : "")));
 
   // Instead of displaying revs, display some debug info:
   //snprintf(str, sizeof(str), "%6d %6d", adc_sample_rate, adc_val);
@@ -502,20 +512,19 @@ void update_lcd(void)
   lcd.setCursor(0, 1);
   lcd.print(str);
 
-#if 0
-  // FIXME if errors != last_errors, flash an error message instead
-  if (errors != last_errors)
-    digitalWrite(LED_RED, HIGH);
-  else
-    digitalWrite(LED_RED, LOW);
-#endif
+
+  // if new errors, flash an error message
+  if (errors != last_errors) {
+    lcd.setCursor(0, 0);
+    lcd.print("Error   ");
+  }
 
   last_errors = errors;
   last_mode = rev_display_mode;
 }
 
 // Update the RPM calculation every ~500 msec (while motor is running)
-// Return 0 if new RPM value available, -1 otherwise.  
+// Return 0 if new RPM value available, -1 otherwise.
 // If the spindle has moved at all, set count_changed = TRUE.
 // RPM > 0 indicates forward
 // RPM < 0 indicates reverse
@@ -533,22 +542,22 @@ int update_rpm(bool *count_changed)
   end_time = hall_count_time;
   interrupts();
 
-  if(end_count == start_count)
+  if (end_count == start_count)
     *count_changed = false;
   else
     *count_changed = true;
 
   // FIXME - we want to update ~500msec while motor is not running also...
   // if > 500 msec since last hall_count_time, then do it anyway.
-  
+
   // If > 500 msec since last update, do it now
   //difftime = end_time - start_time;
   //if (difftime >= 500000) {
 
   // Handle the stall case where hall_count_time has not changed for > 500msec
-  // We need an 'last_update_time' which is either based on the hall_count_time or 
-  // normal time. 
-   
+  // We need an 'last_update_time' which is either based on the hall_count_time or
+  // normal time.
+
   // Else case where motor is running
   if ((end_time - start_time) >= 500000) {
     rpm = hall_count_to_revs(end_count - start_count) / (end_time - start_time) * 1e6 * 60.0;
@@ -561,37 +570,39 @@ int update_rpm(bool *count_changed)
 #else
 void update_rpm(void)
 {
-  static uint32_t start_time, end_time;           // in microseconds
-  static int32_t start_count, end_count;
+  //static uint32_t start_time, end_time;           // in microseconds
+  //static int32_t start_count, end_count;
+  uint32_t t;
+  int32_t count;
+  static uint32_t last_t;
 
   // Get delta T and delta count
   noInterrupts();
-  end_count = hall_count;
-  end_time = hall_count_time;
+  //end_count = hall_count;
+  //end_time = hall_count_time;
+  count = hall_count;
+  t = hall_count_time;
   interrupts();
 
   // Avoid divide by zero if the motor stopped.
-  if (end_time != start_time) {
-    rpm = hall_count_to_revs(end_count - start_count) / (end_time - start_time) * 1e6 * 60.0;
-    start_time = end_time;
-    start_count = end_count;
+  //if (end_time != start_time) {
+  if (t != rpm_update_time) {
+    //rpm = hall_count_to_revs(end_count - start_count) / (end_time - start_time) * 1e6 * 60.0;
+    rpm = hall_count_to_revs(count - rpm_update_hall_count) / (t - rpm_update_time) * 1e6 * 60.0;
+    //start_time = end_time;
+    //start_count = end_count;
+    rpm_update_time = t;
+    rpm_update_hall_count = count;
   }
-  // Also handle the case when the motor stops spinning  
+  // Also handle the case when the motor stops spinning
   else {
     rpm = 0;
-#if 0
-    if ((micros() - end_time) >= 500000) {
-      rpm = hall_count_to_revs(end_count - start_count) / (end_time - start_time) * 1e6 * 60.0;
-      start_time = end_time;
-      start_count = end_count;
-    }
-#endif
   }
 }
 #endif
 
 
-// Debounce the button and return: 
+// Debounce the button and return:
 // PRESSED - recognized immediately
 // NOT_PRESSED - recognized after released for > debounce time
 // SHORT_PRESS - upon release (after debounce), when held down briefly.
@@ -606,7 +617,7 @@ void update_rpm(void)
 #define LONG_PRESS_TIME_MSEC      2500
 
 // States used for debouncing and reporting button status
-#define NOT_PRESSED               0   
+#define NOT_PRESSED               0
 #define PRESSED                   1
 #define LONG_PRESS                2
 #define SHORT_PRESS               3
@@ -628,8 +639,8 @@ void read_buttons(uint8_t *bstate)
   button[1] = ((digitalRead(BUTTON_2)) ? 0 : 1);
   t = millis();
 
-  for(i=0; i<2; i++) {
-    switch(state[i]) {
+  for (i = 0; i < 2; i++) {
+    switch (state[i]) {
 
       // press recoginzed immediately.  release recognized after delay
       // long/short handled differently
@@ -639,8 +650,8 @@ void read_buttons(uint8_t *bstate)
           state[i] = PRESSED;
           press_time[i] = t;
         }
-        break; 
-        
+        break;
+
       case PRESSED:
         if (!button[i]) {
           state[i] = DEBOUNCE;
@@ -653,20 +664,20 @@ void read_buttons(uint8_t *bstate)
 
       case DEBOUNCE:
         // if still not pressed after debounce time, then it was really released
-        if (button[i]) 
+        if (button[i])
           state[i] = PRESSED;
-        else if ((t - debounce_time[i]) >= DEBOUNCE_TIME_MSEC) 
+        else if ((t - debounce_time[i]) >= DEBOUNCE_TIME_MSEC)
           state[i] = SHORT_PRESS;
         break;
 
       case SHORT_PRESS:
         state[i] = NOT_PRESSED;
         break;
-        
+
       case LONG_PRESS:
         state[i] = LONG_PRESSED;
         break;
-        
+
       case LONG_PRESSED:
         if (!button[i]) {
           state[i] = LONG_DEBOUNCE;
@@ -677,14 +688,14 @@ void read_buttons(uint8_t *bstate)
       case LONG_DEBOUNCE:
         if (button[i])
           state[i] = LONG_PRESSED;
-        else if ((t - debounce_time[i]) >= DEBOUNCE_TIME_MSEC)    
+        else if ((t - debounce_time[i]) >= DEBOUNCE_TIME_MSEC)
           state[i] = NOT_PRESSED;
         break;
     }
 
     // Generate outputs.  Some internal states are hidden.
     bstate[i] = state[i];
-    if(state[i] == DEBOUNCE || state[i] == LONG_DEBOUNCE || state[i] == LONG_PRESSED)
+    if (state[i] == DEBOUNCE || state[i] == LONG_DEBOUNCE || state[i] == LONG_PRESSED)
       bstate[i] = PRESSED;
   }
 }
@@ -706,6 +717,19 @@ void setup()
 
   pinMode(LED_RED, OUTPUT);
   digitalWrite(LED_RED, LOW);
+
+  // interrupts on state change of the hall effect sensors
+  // do this early so we catch the first pulses from the motor
+  pinMode(PIN_HALL_A, INPUT);           // no pull-up so we don't interfere with BLDC controller
+  pinMode(PIN_HALL_B, INPUT);
+  pinMode(PIN_HALL_C, INPUT);
+  noInterrupts();     // disable ints
+  pcintSetup(PIN_HALL_A);
+  pcintSetup(PIN_HALL_B);
+  pcintSetup(PIN_HALL_C);
+  last_hall_seq = get_hall_sensors();
+  interrupts();       // enable ints
+  
   delay(10);
 
   // 16x2 line display
@@ -714,8 +738,7 @@ void setup()
 
   // Startup message
   lcd.setCursor(0, 0);
-  //         0123456789012345
-  lcd.print("Motor Mon v1.0.1");
+  lcd.print(VER_STR);
   dtostrf(DRIVE_RATIO, 5, 2, str_ratio);
   snprintf(str, sizeof(str), "Drv. Ratio %5s", str_ratio);
   lcd.setCursor(0, 1);
@@ -723,6 +746,7 @@ void setup()
   delay(1000);
   lcd.clear();
 
+#if 0
   // interrupts on state change
   pinMode(PIN_HALL_A, INPUT);           // no pull-up so we don't interfere with BLDC controller
   pinMode(PIN_HALL_B, INPUT);
@@ -733,6 +757,7 @@ void setup()
   pcintSetup(PIN_HALL_C);
   last_hall_seq = get_hall_sensors();
   interrupts();       // enable ints
+#endif
 
   init_adc();
 
@@ -746,8 +771,25 @@ void setup()
     delay(1000);
     lcd.clear();
   }
-  
-  //update_lcd();
+
+#if 0
+  {
+    // read fuse bits
+    // ff d8 cb ef
+    uint8_t data1, data2, data3, data4;
+    noInterrupts();
+    data1 = boot_lock_fuse_bits_get(GET_LOW_FUSE_BITS);       // 0xff
+    data2 = boot_lock_fuse_bits_get(GET_HIGH_FUSE_BITS);      // 0xd8 
+    data3 = boot_lock_fuse_bits_get(GET_EXTENDED_FUSE_BITS);  // 0xcb - should bx 0xf9 or 0xf8 for 3.5V, 4.3V BOD
+    data4 = boot_lock_fuse_bits_get(GET_LOCK_BITS);           // 0xef
+    interrupts();
+    snprintf(str, sizeof(str), "%02hx %02hx %02hx %02hx", data1, data2, data3, data4);
+    lcd.setCursor(0, 1);
+    lcd.print(str);
+    delay(2000);
+    lcd.clear();
+  }
+#endif
 }
 
 // the loop function runs over and over again forever
@@ -764,56 +806,48 @@ void loop()
 
   // We want to run this loop fast.  This helps with button debouncing and possibly other things.
   tmsec = millis();
-  
+
   digitalWrite(LED_BUILTIN, led);
   led = led ^ 1;
-  
+
   // Handle the button. Short press means switch between incremental and absolute (lifetime).
   // Long press means zero incremental rev count.
   // Maybe also meanings for holding button at boot (and also for long hold > 10 seconds - factory default?)
-  
+
   read_buttons(buttons);
-  if(buttons[0] == LONG_PRESS) {
+  if (buttons[0] == LONG_PRESS) {
     // Clear rev counter
     noInterrupts();               // critical section - updated in ISR
-    hall_count = 0;              
+    hall_count = 0;
     interrupts();
     lcd_update_time = 0;          // force immediate update
   }
-  else if(buttons[0] == SHORT_PRESS) {
+  else if (buttons[0] == SHORT_PRESS) {
     // Toggle between incremental and absolute modes
     rev_display_mode ^= 1;
     digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
   }
-#if 0
-  else if(buttons[0] == PRESSED) {
-    digitalWrite(LED_RED, 1);   // testing
-  }
-  else if(buttons[0] == NOT_PRESSED) {
-    digitalWrite(LED_RED, 0);
-  }
-#endif
 
   // If the spindle moved, update the FRAM.  FRAM write are essentially limitless, so this should be
-  // safe. By writing FRAM often we minimize missed counts if power cuts unexpectedly. 
+  // safe. By writing FRAM often we minimize missed counts if power cuts unexpectedly.
   noInterrupts();
   count = hall_count;
   interrupts();
-  if(count != last_hall_count) {
+  if (count != last_hall_count) {
     // FRAM write takes about 3 msec @ 100KHz.
     store_fram();
     last_hall_count = count;
   }
 
   // Periodically compute the RPM and AC current, and update the LCD
-  if((tmsec - lcd_update_time) >= LCD_UPDATE_TIME_MSEC) {
+  if ((tmsec - lcd_update_time) >= LCD_UPDATE_TIME_MSEC) {
 
     update_rpm();
-   
+
     // Current sense transformer RMS voltage
     // Vrms = ADC_DN / 512 / Gain * 2.56
     rms_volt = (float)adc_rms / 512 * 2.56;
-  
+
     // Calculate motor current.  Sensor is slightly nonlinear.
     // Irms = coil Vrms * 10.31 at Irms = 1A
     // Irms = coil Vrms * 10.0 at Irms = 10A
@@ -821,7 +855,7 @@ void loop()
 
     update_lcd();
     lcd_update_time = tmsec;
-        
+
     digitalWrite(LED_RED, !digitalRead(LED_RED));
   }
 
