@@ -1,5 +1,5 @@
 # bldc_motor_monitor
-This is a motor monitor for the LMS5200 mini-lathe, LMS3990 mini-mill and similar tools that use the XMT-DRV-500C(3) / ZM3404 BLDC motor controller.
+This is a tachometer, counter, and current meter for the LMS 5200 mini-lathe, LMS 3990 mini-mill and similar tools that use the XMT-DRV-500C(3) / ZM3404 BLDC motor controller.
 
 This project provides a small 2x16 line LCD display showing:
 - Spindle RPM and direction
