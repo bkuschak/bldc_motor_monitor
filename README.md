@@ -10,7 +10,7 @@ It consists of a small PCB hosting the LCD, Arduino Micro R3, and connectors tha
 optional toroidal transformer to sense AC line current.  A single pushbutton is used to clear the rev count and alternate between
 modes. This photos shows the board during early testing.  A mounting solution is in progress.
 
-<img src="photos/motor_monitor_pcb.jpg" width="480" alt="Monitor Board">
+<img src="photos/installed_on_lathe.jpg" width="480" alt="Installed">
 
 This project was motivated by the need to keep an accurate count of spindle revolutions while winding coils on a mini-lathe. 
 Since the BLDC motor controller already has a means of tracking spindle revolutions, it was easy to tap into this circuit rather than 
