@@ -8,7 +8,7 @@ This project provides a small 2x16 line LCD display showing:
 
 It consists of a small PCB hosting the LCD, Arduino Micro R3, and connectors that mate inline with the BLDC sensor cable. It uses an 
 optional toroidal transformer to sense AC line current.  A single pushbutton is used to clear the rev count and alternate between
-modes. This photos shows the board during early testing.  A mounting solution is in progress.
+modes.
 
 <img src="photos/installed_on_lathe.jpg" width="480" alt="Installed">
 
