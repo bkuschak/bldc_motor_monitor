@@ -12,6 +12,10 @@ modes.
 
 <img src="photos/installed_on_lathe.jpg" width="480" alt="Installed">
 
+<img src="photos/front.jpg" width="480" alt="Front">
+
+<img src="photos/back.jpg" width="480" alt="Back">
+
 This project was motivated by the need to keep an accurate count of spindle revolutions while winding coils on a mini-lathe. 
 Since the BLDC motor controller already has a means of tracking spindle revolutions, it was easy to tap into this circuit rather than 
 adding external encoders or hall-effect sensors.  
